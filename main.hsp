@@ -1,0 +1,343 @@
+#epack "splash.png"
+
+#include "obj.as"
+#include "hsp3util.as"
+#include "mod_img.as"
+#uselib "user32.dll"
+
+#func    global SetWindowRgn       "SetWindowRgn" sptr,sptr,sptr
+
+#func SetLayeredWindowAttributes "SetLayeredWindowAttributes" int, int, int, int
+#func SetWindowLong "SetWindowLongA" int, int, int
+#cfunc GetWindowLong "GetWindowLongA" int, int, int
+#define LWA_COLORKEY 0x0001
+#define ctype RGB(%1 = 0, %2 = 0, %3 = 0) (int(%1) | int(%2)<<8 | int(%3)<<16)
+#define WS_EX_LAYERED 0x80000
+#define GWL_EXSTYLE -20
+#define WS_EX_TRANSPARENT $00000020
+
+#uselib "gdi32"
+#func    global CreateRoundRectRgn "CreateRoundRectRgn" sptr,sptr,sptr,sptr,sptr,sptr
+
+#define btn_mouse(%1, %2, %3, %4) 	mousex >= %1 and mousex <= %2 and mousey >= %3 and mousey <= %4
+#define TRUE 1
+#define FALSE 0
+
+#define Version "1.1.1 Stable"
+
+/*----------BOOT----------*/
+Bgscr 0, 400, 800, 0, ginfo_dispx / 2 - 200, ginfo_dispy /2 - 400
+title "KARAAGE God hand"
+gsel 0, 2
+
+picload "splash.png"
+//picload "splash.png", 1
+
+// 透過できるようにする
+SetWindowLong hWnd@hsp, GWL_EXSTYLE, GetWindowLong(hWnd@hsp, GWL_EXSTYLE) | WS_EX_LAYERED
+// この関数の２番目の引数に透過色を指定
+SetLayeredWindowAttributes hWnd@hsp, RGB(0, 255, 0), 255, LWA_COLORKEY
+
+await 4000
+gsel 0, -1
+
+onclick gosub *move
+
+Bgscr 0, 810, 530, 0, ginfo_dispx / 2 - 405, ginfo_dispy / 2 - 265
+gsel 0, 1
+
+dim DataName, 3
+DataName(0) = "": DataName(1) = "": DataName(2) = ".": DataNum = "": DataStartNum = "": DataGetInterval = "1"
+objmode 2
+
+*main
+    /*----------InputBox----------*/
+    /*-----データ名-----*/
+    pos 30, 100: input DataName(0), 300, 30, 100
+    pos 380, 100: input DataName(1), 300, 30, 100
+    pos 690, 100: input DataName(2), 100, 30, 100
+    /*-----データ開始番号-----*/
+    pos 30, 180: input DataStartNum, 100, 30, 10
+    /*-----データ数-----*/
+    pos 30, 260: input DataNum, 100, 30, 10
+    /*-----出力データ間隔-----*/
+    pos 30, 340: input DataGetInterval, 100, 30, 10
+
+    /*-----PROCESSボタン-----*/
+    objsize 100, 30: pos 690, 460
+    button "PROCESS", *ProcessMain
+    ProcessBtnID = stat
+
+    /*-----メインループ-----*/
+    repeat
+        redraw 0
+        color 30, 30, 30: boxf
+
+        /*-----タイトル-----*/
+        font "メイリオ", 20, 16
+        if (ginfo_act == 0) {
+            color 100, 0, 100
+            boxf 0, 0, 3, 530
+            boxf 806, 0, 810, 530
+            boxf 0, 0, 810, 3
+            boxf 0, 502, 810, 530
+
+            color 234, 72, 164
+            pos 120, 10: print "KARAAGE God Hand "+Version
+        }
+        else {
+            color 70, 70, 70
+            boxf 0, 0, 3, 530
+            boxf 806, 0, 810, 530
+            boxf 0, 0, 810, 3
+            boxf 0, 507, 810, 530
+            color 100, 0, 100: boxf 5, 502, 805, 524
+
+            color 100, 100, 100
+            pos 120, 10: print "KARAAGE God Hand "+Version
+        }
+
+        //閉じるボタン
+        if (btn_mouse 710, 800, 10, 35) {
+            getkey key, 1
+            if (key == 1): end
+            color 200, 90, 90
+        }
+        else {
+            color 200, 30, 30
+        }
+        boxf 710, 10, 800, 35 //閉じるボタン
+        font "Marlett",20
+        color 255, 255, 255: pos 745, 12: print "r"
+        
+        //最小化ボタン
+        if (btn_mouse 610, 700, 10, 35) {
+            getkey key, 1
+            if (key == 1): sendmsg hwnd, $112, $F020
+            color 90, 90, 90
+        }
+        else {
+            color 70, 70, 70
+        }
+        boxf 610, 10, 700, 35 //最小化ボタン
+        font "Marlett",20
+        color 255, 255, 255: pos 647, 12: print "0"
+        font "メイリオ", 15, 16: color 255, 255, 255
+        pos 10, 503: print "OK: God Hand Ready"
+        color 255, 255, 255
+
+        /*-----データ名入力欄-----*/
+        font "メイリオ", 15, 16
+        pos 10, 50: print "データ名"
+        pos 30, 70: print "FAST": pos 380, 70: print "LAST": pos 690, 70: print "EXTENSION"
+        /*-----データ開始番号入力欄-----*/
+        pos 10, 150: print "データ開始番号"
+        /*-----データ数入力欄-----*/
+        pos 10, 230: print "データ数"
+        /*-----出力データ間隔入力欄-----*/
+        pos 10, 310: print "出力データ間隔"
+
+        /*-----PROCESSボタン有効、無効化-----*/
+        if ((DataStartNum == "") || (DataNum == "") || (DataGetInterval == "") || (DataGetInterval == "0")) {
+            objgray ProcessBtnID, -1
+            if (stat == 1): objgray ProcessBtnID, 0
+        }
+        else {
+            objgray ProcessBtnID, -1
+            if (stat == 0): objgray ProcessBtnID, 1
+        }
+
+        redraw 1
+        await
+    loop
+    
+
+*ProcessMain
+    percentage = 0
+    IntervalCnt = 0
+    OutedFiles = 0
+
+    color 30, 30, 30: boxf
+    clrobj
+    
+    EndFiles = 0
+
+	pos 50, 100
+    progbar 700, 25
+    progbarID = stat
+    progbar_set progbarID, 100/DataNum
+
+    MainDir = dir_cur   //カレントディレクトリ取得
+    chdir "Input"
+    
+    sdim InputDataList, int(DataNum)
+    dirlist InputDataList, "*"+DataName(2), 0   //データ名一覧取得
+
+    chdir MainDir   //メインディレクトリに戻る
+
+    sdim InputData, 100, int(DataNum)
+    sdim InputDataNumList, 100, int(DataNum)
+
+    FirstDataNameLen = strlen(DataName(0))  //データFIRST名文字数取得
+    LastDataNameLen = strlen(DataName(1))   //データLAST名文字数取得
+    ExtentionDataNameLen = strlen(DataName(2)) //データ拡張子文字数取得
+    notesel InputDataList
+    repeat noteinfo(0) //全体の行数
+        noteget InputData(cnt), cnt //データ参照
+        InputDataNumName = strlen(InputData(cnt)) - FirstDataNameLen - LastDataNameLen - ExtentionDataNameLen  //Inputデータの数字部分の長さを取得
+        InputDataNumList(cnt) = strmid(InputData(cnt), FirstDataNameLen, InputDataNumName)  //Inputデータの数字部分を取り出す。
+    loop
+
+    test = int(InputDataNumList(1))
+
+    repeat
+            for i, 0, int(DataNum), 1
+                if ((int(InputDataNumList(i)) == EndFiles) && (EndFiles >= int(DataStartNum))) {
+                    if ((OutedFiles == 0) && (EndFiles != 0)): _break
+                    bcopy "Input\\"+DataName(0)+""+InputDataNumList(i)+""+DataName(1)+""+DataName(2), "Output\\"+DataName(0)+""+InputDataNumList(i)+""+DataName(1)+""+DataName(2)
+                    _break
+                }
+            next
+        IntervalCnt++
+        OutedFiles++
+
+        if (OutedFiles == int(DataNum)): break
+        EndFiles += int(DataGetInterval)
+
+        progbar_step progbarID
+        percentage += 100/int(DataNum)
+
+        redraw 0
+        //UI描画
+        color 30, 30, 30: boxf
+        font "メイリオ", 20, 16
+        if (ginfo_act == 0) {
+            color 100, 0, 100
+            boxf 0, 0, 3, 530
+            boxf 806, 0, 810, 530
+            boxf 0, 0, 810, 3
+            boxf 0, 502, 810, 530
+
+            color 234, 72, 164
+            pos 120, 10: print "KARAAGE God Hand "+Version
+        }
+        else {
+            color 70, 70, 70
+            boxf 0, 0, 3, 530
+            boxf 806, 0, 810, 530
+            boxf 0, 0, 810, 3
+            boxf 0, 507, 810, 530
+            color 100, 0, 100: boxf 5, 502, 805, 524
+
+            color 100, 100, 100
+            pos 120, 10: print "KARAAGE God Hand "+Version
+        }
+
+        //閉じるボタン
+        if (btn_mouse 710, 800, 10, 35) {
+            getkey key, 1
+            if (key == 1): end
+            color 200, 90, 90
+        }
+        else {
+            color 200, 30, 30
+        }
+        boxf 710, 10, 800, 35 //閉じるボタン
+        font "Marlett",20
+        color 255, 255, 255: pos 745, 12: print "r"
+        
+        //最小化ボタン
+        if (btn_mouse 610, 700, 10, 35) {
+            getkey key, 1
+            if (key == 1): sendmsg hwnd, $112, $F020
+            color 90, 90, 90
+        }
+        else {
+            color 70, 70, 70
+        }
+
+        boxf 610, 10, 700, 35 //最小化ボタン
+        font "Marlett",20
+        color 255, 255, 255: pos 647, 12: print "0"
+        font "メイリオ", 15, 16: color 255, 255, 255
+        pos 10, 503: print "Processing: 処理データ数"+OutedFiles+"/"+DataNum+": "+percentage+"%"
+
+        font "メイリオ", 15, 16
+        color 255, 255, 255: pos 50, 70: print "処理データ数"+OutedFiles+"/"+DataNum+": "+percentage+"%"
+
+        redraw 1
+        await
+    loop
+    font "メイリオ", 15, 16
+    progbar_step progbarID
+    percentage += 100/DataNum
+    
+    redraw 0
+    //UI描画
+    color 30, 30, 30: boxf
+    font "メイリオ", 20, 16
+    if (ginfo_act == 0) {
+        color 100, 0, 100
+        boxf 0, 0, 3, 530
+        boxf 806, 0, 810, 530
+        boxf 0, 0, 810, 3
+        boxf 0, 502, 810, 530
+    
+        color 234, 72, 164
+        pos 120, 10: print "KARAAGE God Hand "+Version
+    }
+    else {
+        color 70, 70, 70
+        boxf 0, 0, 3, 530
+        boxf 806, 0, 810, 530
+        boxf 0, 0, 810, 3
+        boxf 0, 507, 810, 530
+        color 100, 0, 100: boxf 5, 502, 805, 524
+    
+        color 100, 100, 100
+        pos 120, 10: print "KARAAGE God Hand "+Version
+    }
+    
+    //閉じるボタン
+    if (btn_mouse 710, 800, 10, 35) {
+        getkey key, 1
+        if (key == 1): end
+        color 200, 90, 90
+    }
+    else {
+        color 200, 30, 30
+    }
+    boxf 710, 10, 800, 35 //閉じるボタン
+    font "Marlett",20
+    color 255, 255, 255: pos 745, 12: print "r"
+    
+    //最小化ボタン
+    if (btn_mouse 610, 700, 10, 35) {
+        getkey key, 1
+        if (key == 1): sendmsg hwnd, $112, $F020
+        color 90, 90, 90
+    }
+    else {
+        color 70, 70, 70
+    }
+    boxf 610, 10, 700, 35 //最小化ボタン
+    font "Marlett",20
+    color 255, 255, 255: pos 647, 12: print "0"
+    font "メイリオ", 15, 16: color 255, 255, 255
+    pos 10, 503: print "Processing: 処理データ数"+OutedFiles+"/"+DataNum+": 100%"
+
+    font "メイリオ", 15, 16
+    color 255, 255, 255: pos 50, 70: print "処理データ数"+OutedFiles+"/"+DataNum+": 100%"
+
+    redraw 1
+    dialog "プロセスは正常に終了しました。", 0, "SUCCESS"
+    clrobj
+goto *main
+
+//ウィンドウ移動
+*move
+    if (btn_mouse 0, 605, 0, 40) {
+        if (wparam = 1) : sendmsg hwnd, $00A1, 2, 0
+    }
+
+    return
